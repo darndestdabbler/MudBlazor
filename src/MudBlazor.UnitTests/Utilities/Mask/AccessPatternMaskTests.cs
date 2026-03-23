@@ -290,4 +290,73 @@ public class AccessPatternMaskTests
         mask.Insert("K2M5B4");
         mask.Text.Should().Be("K2M 5B4");
     }
+
+    // --- Zip code pattern (mixed required/optional digits) ---
+
+    [Test]
+    public void ZipCode_RequiredAndOptionalDigits()
+    {
+        var mask = new AccessPatternMask(@"00000\-9999");
+        mask.Insert("123454321");
+        mask.Text.Should().Be("12345-4321");
+    }
+
+    [Test]
+    public void ZipCode_OnlyRequiredFilled()
+    {
+        var mask = new AccessPatternMask(@"00000\-9999");
+        mask.Insert("12345");
+        mask.IsMaskComplete.Should().BeTrue();
+    }
+
+    // --- Unrecognized characters treated as literal delimiters ---
+
+    [Test]
+    public void UnrecognizedChar_TreatedAsLiteralDelimiter()
+    {
+        // Characters not in the mask token set are literal delimiters.
+        var mask = new AccessPatternMask("000-0000");
+        mask.Insert("5551234");
+        mask.Text.Should().Be("555-1234");
+    }
+
+    // --- Null mask input ---
+
+    [Test]
+    public void Constructor_NullMask_ThrowsArgumentNullException()
+    {
+        var act = () => new AccessPatternMask(null!);
+        act.Should().Throw<ArgumentNullException>();
+    }
+
+    // --- Trailing escape ---
+
+    [Test]
+    public void TrailingEscape_TreatedAsLiteralDelimiter()
+    {
+        // A trailing \ has nothing to escape — it becomes a literal backslash delimiter.
+        var mask = new AccessPatternMask("00\\");
+        mask.Insert("12");
+        mask.Text.Should().Be("12\\");
+    }
+
+    // --- Northwind phone mask (with optional character extension) ---
+
+    [Test]
+    public void NorthwindPhone_WithOptionalExtension()
+    {
+        // Actual Northwind pattern: \(000\) 000\-0000\ CCCCCCCC
+        var mask = new AccessPatternMask(@"\(000\) 000\-0000\ CCCCCCCC");
+        mask.Insert("5551234567ext12");
+        mask.Text.Should().Be("(555) 123-4567 ext12");
+    }
+
+    [Test]
+    public void NorthwindPhone_NoExtension_IsMaskComplete()
+    {
+        var mask = new AccessPatternMask(@"\(000\) 000\-0000\ CCCCCCCC");
+        mask.Insert("5551234567");
+        // Only 0 positions are required; C positions are optional.
+        mask.IsMaskComplete.Should().BeTrue();
+    }
 }
