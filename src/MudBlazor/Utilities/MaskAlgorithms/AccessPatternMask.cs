@@ -21,12 +21,18 @@ namespace MudBlazor;
 ///   <item><term><c>L</c></term><description>Letter (a–z, A–Z), required.</description></item>
 ///   <item><term><c>?</c></term><description>Letter (a–z, A–Z), optional.</description></item>
 ///   <item><term><c>A</c></term><description>Letter or digit, required.</description></item>
+///   <item><term><c>a</c></term><description>Letter or digit, optional.</description></item>
 ///   <item><term><c>&amp;</c></term><description>Any character, required.</description></item>
 ///   <item><term><c>C</c></term><description>Any character, optional.</description></item>
 ///   <item><term><c>\</c></term><description>Escape: treats the next character as a literal delimiter.</description></item>
+///   <item><term><c>"..."</c></term><description>Quoted literal: characters inside double quotes are treated as literal delimiters.</description></item>
 /// </list>
 /// <para>
 /// Characters not in the table above are treated as literal delimiters and are displayed as-is.
+/// </para>
+/// <para>
+/// If the mask contains semicolons, only the first section is used as the mask pattern
+/// (Access masks support <c>mask;placeholder;literal</c> sections).
 /// </para>
 /// </remarks>
 /// <seealso cref="PatternMask" />
@@ -43,6 +49,7 @@ public class AccessPatternMask : PatternMask
         MaskChar.Letter('L'),                             // Letter required
         MaskChar.Letter('?'),                             // Letter optional
         MaskChar.LetterOrDigit('A'),                      // Alphanumeric required
+        MaskChar.LetterOrDigit('a'),                      // Alphanumeric optional
         new MaskChar('&', @"."),                           // Any character required
         new MaskChar('C', @"."),                           // Any character optional
     ];
@@ -51,7 +58,7 @@ public class AccessPatternMask : PatternMask
     private static readonly HashSet<char> RequiredChars = ['0', 'L', 'A', '&'];
 
     // Characters that are valid Access mask tokens (both required and optional).
-    private static readonly HashSet<char> AllMaskTokens = ['0', '9', '#', 'L', '?', 'A', '&', 'C'];
+    private static readonly HashSet<char> AllMaskTokens = ['0', '9', '#', 'L', '?', 'A', 'a', '&', 'C'];
 
     // Unicode Private Use Area base. Escaped characters that conflict with mask tokens
     // are replaced with PUA characters (U+E000+) in the internal mask, then swapped back
@@ -158,19 +165,50 @@ public class AccessPatternMask : PatternMask
     {
         ArgumentNullException.ThrowIfNull(accessMask);
 
-        var processed = new StringBuilder(accessMask.Length);
+        // Access masks support up to 3 semicolon-delimited sections:
+        // mask;placeholder;literal — only the first section is the mask pattern.
+        var semicolonIndex = accessMask.IndexOf(';');
+        var maskSection = semicolonIndex >= 0 ? accessMask[..semicolonIndex] : accessMask;
+
+        var processed = new StringBuilder(maskSection.Length);
         var required = new List<bool>();
         puaToOriginal = new Dictionary<char, char>();
         var nextPua = PuaBase;
         var i = 0;
 
-        while (i < accessMask.Length)
+        while (i < maskSection.Length)
         {
-            var c = accessMask[i];
+            var c = maskSection[i];
 
-            if (c == '\\' && i + 1 < accessMask.Length)
+            if (c == '"')
             {
-                var escaped = accessMask[i + 1];
+                // Quoted literal — everything until the closing quote is a literal.
+                i++;
+                while (i < maskSection.Length && maskSection[i] != '"')
+                {
+                    var quoted = maskSection[i];
+                    if (AllMaskTokens.Contains(quoted))
+                    {
+                        var pua = nextPua++;
+                        puaToOriginal[pua] = quoted;
+                        processed.Append(pua);
+                    }
+                    else
+                    {
+                        processed.Append(quoted);
+                    }
+
+                    required.Add(false);
+                    i++;
+                }
+
+                // Skip the closing quote (if present).
+                if (i < maskSection.Length)
+                    i++;
+            }
+            else if (c == '\\' && i + 1 < maskSection.Length)
+            {
+                var escaped = maskSection[i + 1];
 
                 if (AllMaskTokens.Contains(escaped))
                 {

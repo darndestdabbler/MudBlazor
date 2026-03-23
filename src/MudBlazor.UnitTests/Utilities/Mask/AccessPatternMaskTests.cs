@@ -359,4 +359,112 @@ public class AccessPatternMaskTests
         // Only 0 positions are required; C positions are optional.
         mask.IsMaskComplete.Should().BeTrue();
     }
+
+    // --- Feature: 'a' (alphanumeric optional) token ---
+
+    [Test]
+    public void Insert_AlphanumericOptional_AcceptsLettersAndDigits()
+    {
+        var mask = new AccessPatternMask("aaa");
+        mask.Insert("x1y");
+        mask.Text.Should().Be("x1y");
+    }
+
+    [Test]
+    public void Insert_AlphanumericOptional_AcceptsPartialInput()
+    {
+        var mask = new AccessPatternMask("aaa");
+        mask.Insert("x");
+        mask.Text.Should().Be("x");
+    }
+
+    [Test]
+    public void Insert_AlphanumericOptional_RejectsSpecialChars()
+    {
+        var mask = new AccessPatternMask("aaa");
+        mask.Insert("!@#");
+        mask.Text.Should().BeEmpty();
+    }
+
+    [Test]
+    public void IsMaskComplete_AlphanumericOptional_NotRequired()
+    {
+        // 'A' is required, 'a' is optional — filling only 'A' should be complete.
+        var mask = new AccessPatternMask("Aa");
+        mask.Insert("X");
+        mask.IsMaskComplete.Should().BeTrue();
+    }
+
+    // --- Feature: Semicolon section parsing ---
+
+    [Test]
+    public void Semicolon_UsesOnlyFirstSection()
+    {
+        // "000-0000;_; " — only the mask "000-0000" is used.
+        var mask = new AccessPatternMask("000-0000;_;x");
+        mask.Insert("5551234");
+        mask.Text.Should().Be("555-1234");
+    }
+
+    [Test]
+    public void Semicolon_NoSemicolon_WorksNormally()
+    {
+        var mask = new AccessPatternMask("000");
+        mask.Insert("123");
+        mask.Text.Should().Be("123");
+    }
+
+    [Test]
+    public void Semicolon_AccessMaskPreservesOriginal()
+    {
+        var original = "000-0000;_;x";
+        var mask = new AccessPatternMask(original);
+        mask.AccessMask.Should().Be(original);
+    }
+
+    // --- Feature: Quoted literals ---
+
+    [Test]
+    public void QuotedLiteral_TreatsContentAsLiteral()
+    {
+        // "ab" makes 'a' and 'b' literal, not mask tokens.
+        var mask = new AccessPatternMask("00\"ab\"00");
+        mask.Insert("1234");
+        mask.Text.Should().Be("12ab34");
+    }
+
+    [Test]
+    public void QuotedLiteral_MaskTokensBecomeLiteral()
+    {
+        // L inside quotes is literal 'L', not letter-required.
+        var mask = new AccessPatternMask("00\"L\"00");
+        mask.Insert("1234");
+        mask.Text.Should().Be("12L34");
+    }
+
+    [Test]
+    public void QuotedLiteral_EmptyQuotes_NoEffect()
+    {
+        var mask = new AccessPatternMask("\"\"000");
+        mask.Insert("123");
+        mask.Text.Should().Be("123");
+    }
+
+    [Test]
+    public void QuotedLiteral_UnclosedQuote_TreatsRestAsLiteral()
+    {
+        // Unclosed quote — everything after the opening quote is literal.
+        var mask = new AccessPatternMask("00\"ab");
+        mask.Insert("12");
+        mask.Text.Should().Be("12ab");
+    }
+
+    [Test]
+    public void QuotedLiteral_IsMaskComplete_LiteralsNotRequired()
+    {
+        // Quoted characters are literal delimiters, not required positions.
+        var mask = new AccessPatternMask("00\"LL\"00");
+        mask.Insert("1234");
+        mask.IsMaskComplete.Should().BeTrue();
+    }
 }
