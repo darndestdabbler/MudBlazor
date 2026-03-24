@@ -422,6 +422,97 @@ public class AccessPatternMaskTests
         mask.AccessMask.Should().Be(original);
     }
 
+    // --- Ported from WPF MaskParser tests ---
+    // The following tests were ported from dabbler-wpf MaskParserTests.cs.
+    // WPF tests verify parsing (segment types/counts); Blazor equivalents
+    // verify the same behavior through insertion and text output.
+
+    [Test]
+    public void AllMaskCharacters_CombinedInsertion()
+    {
+        // WPF: Parse_AllMaskCharacters_ReturnsCorrectTypes
+        // Mask "09L?Aa&C" — one of each mask character type.
+        // 0=digit req, 9=digit opt, L=letter req, ?=letter opt,
+        // A=alnum req, a=alnum opt, &=any req, C=any opt
+        var mask = new AccessPatternMask("09L?Aa&C");
+        mask.Insert("51Xb3y!@");
+        mask.Text.Should().Be("51Xb3y!@");
+    }
+
+    [Test]
+    public void AllMaskCharacters_RequiredOnly_IsMaskComplete()
+    {
+        // 0, L, A, & are required; 9, ?, a, C are optional.
+        // Fill all 8 positions then verify IsMaskComplete is true.
+        var mask = new AccessPatternMask("09L?Aa&C");
+        mask.Insert("51Xb3y!@");
+        mask.IsMaskComplete.Should().BeTrue();
+    }
+
+    [Test]
+    public void EmptyMask_ProducesNoOutput()
+    {
+        // WPF: Parse_EmptyMask_ThrowsArgumentException
+        // AccessPatternMask delegates to PatternMask which accepts empty masks.
+        var mask = new AccessPatternMask("");
+        mask.Insert("123");
+        mask.Text.Should().BeEmpty();
+    }
+
+    [Test]
+    public void WhitespaceMask_ProducesNoEditablePositions()
+    {
+        // WPF: Parse_WhitespaceMask_ThrowsArgumentException
+        // Spaces are not mask tokens — they become literal delimiters.
+        // With no editable positions, no input is accepted.
+        var mask = new AccessPatternMask("   ");
+        mask.Insert("abc");
+        mask.Text.Should().BeEmpty();
+    }
+
+    [Test]
+    public void SSN_AllEditablePositions_AreDigitRequired()
+    {
+        // WPF: Parse_SSNMask_ParsesCorrectly — verifies all non-literal
+        // segments are DigitRequired. Behavioral equivalent: letters rejected,
+        // only digits accepted in all 9 positions.
+        var mask = new AccessPatternMask("000-00-0000");
+        mask.Insert("abcdefghi");
+        mask.Text.Should().BeEmpty();
+
+        mask.Insert("123456789");
+        mask.Text.Should().Be("123-45-6789");
+        mask.IsMaskComplete.Should().BeTrue();
+    }
+
+    [Test]
+    public void DigitPosition_RejectsSpaces()
+    {
+        // WPF: MaskSegment_Accepts_DigitRequired — space rejected.
+        var mask = new AccessPatternMask("000");
+        mask.Insert("1 2");
+        // Space is rejected at position 1, so only '1' and '2' are accepted.
+        mask.Text.Should().Be("12");
+    }
+
+    [Test]
+    public void LetterPosition_RejectsSpecialChars()
+    {
+        // WPF: MaskSegment_Accepts_LetterRequired — non-letter rejected.
+        var mask = new AccessPatternMask("LLL");
+        mask.Insert("a!b");
+        mask.Text.Should().Be("ab");
+    }
+
+    [Test]
+    public void AlphanumericPosition_RejectsSpecialChars()
+    {
+        // WPF: MaskSegment_Accepts_AlphanumericRequired — special char rejected.
+        var mask = new AccessPatternMask("AAA");
+        mask.Insert("a-1");
+        mask.Text.Should().Be("a1");
+    }
+
     // --- Feature: Quoted literals ---
 
     [Test]
