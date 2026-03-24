@@ -1961,7 +1961,7 @@ namespace MudBlazor
         /// </summary>
         /// <param name="item"></param>
         /// <returns></returns>
-        internal async Task CommitItemChangesAsync(T item)
+        public async Task CommitItemChangesAsync(T item)
         {
             // Here, we need to validate at the cellular level...
             if (CommittedItemChanges != null)
@@ -1974,7 +1974,7 @@ namespace MudBlazor
         /// is anything but Cell since the _editingItem is used.
         /// </summary>
         /// <returns></returns>
-        internal async Task CommitItemChangesAsync()
+        public async Task CommitItemChangesAsync()
         {
             Debug.Assert(_editingItem is not null);
             Debug.Assert(_editForm is not null);
